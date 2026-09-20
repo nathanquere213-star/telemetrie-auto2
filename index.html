@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pocket Dyno</title>
+    <title>Pocket Dyno Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -19,24 +19,23 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* Styles pour les inputs */
         input[type="number"] {
             background-color: transparent;
             border: none;
-            border-bottom: 2px solid #fff;
+            border-bottom: 1px solid #666;
             color: #fff;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             text-align: center;
             width: 100%;
             outline: none;
             border-radius: 0;
             appearance: none;
+            padding-bottom: 0.25rem;
         }
         input[type="number"]:focus {
-            border-bottom-color: #888;
+            border-bottom-color: #fff;
         }
 
-        /* Boutons personnalisés */
         .btn {
             border: 2px solid #fff;
             background: transparent;
@@ -51,15 +50,15 @@
             display: block;
             text-align: center;
         }
-        .btn:active, .btn.active {
+        .btn:active {
             background: #fff;
             color: #000;
         }
         
         .btn-go {
             border-radius: 50%;
-            width: 200px;
-            height: 200px;
+            width: 180px;
+            height: 180px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -78,170 +77,185 @@
             display: flex;
         }
 
-        /* Styles pour l'impression (PDF) */
+        /* Message Box personnalisée pour remplacer alert() */
+        #msg-box {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+        #msg-box.active { display: flex; }
+
         @media print {
-            body {
-                background-color: #fff !important;
-                color: #000 !important;
-            }
-            .no-print {
-                display: none !important;
-            }
-            .print-only {
-                display: block !important;
-            }
-            #chart-container {
-                width: 100% !important;
-                height: 500px !important;
-            }
-            .print-header {
-                border-bottom: 4px solid #000;
-                padding-bottom: 1rem;
-                margin-bottom: 2rem;
-            }
+            body { background-color: #fff !important; color: #000 !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            #chart-container { width: 100% !important; height: 500px !important; background: #fff !important; }
+            .print-border { border-color: #000 !important; }
+            .print-text { color: #000 !important; }
         }
     </style>
 </head>
 <body>
 
+    <!-- BOITE DE MESSAGE (Erreurs / Infos) -->
+    <div id="msg-box">
+        <div class="border-2 border-white p-6 max-w-sm w-full text-center bg-black">
+            <p id="msg-text" class="mb-6"></p>
+            <button onclick="closeMessage()" class="btn text-sm p-3">Fermer</button>
+        </div>
+    </div>
+
     <!-- ÉCRAN 1 : AUTORISATIONS -->
     <div id="screen-auth" class="screen active justify-center items-center text-center">
-        <h1 class="text-4xl font-extrabold mb-2 uppercase tracking-widest">Pocket Dyno</h1>
-        <p class="text-gray-400 mb-12 text-sm">Télémétrie & Puissance Embarquée</p>
+        <h1 class="text-4xl font-extrabold mb-2 uppercase tracking-widest">Dyno Pro</h1>
+        <p class="text-gray-400 mb-12 text-xs uppercase tracking-widest">Télémétrie Haute Précision</p>
         
         <div class="space-y-6 w-full max-w-sm">
-            <p class="text-sm mb-6">Cette application nécessite l'accès au GPS et aux capteurs de mouvement (gyroscope/accéléromètre) pour calculer la puissance.</p>
-            <button onclick="requestPermissions()" class="btn">Autoriser les capteurs</button>
+            <p class="text-sm mb-6 text-gray-300">Cette application utilise la fusion des capteurs (Accéléromètre 60Hz + GPS 1Hz) pour annuler les vibrations moteur et tracer des courbes réalistes.</p>
+            <button onclick="requestPermissions()" class="btn">Activer les capteurs</button>
         </div>
     </div>
 
-    <!-- ÉCRAN 2 : MENU PRINCIPAL -->
-    <div id="screen-menu" class="screen justify-center items-center">
-        <h2 class="text-3xl font-bold mb-12 uppercase">Menu</h2>
-        <div class="space-y-6 w-full max-w-sm">
-            <button onclick="showScreen('screen-setup')" class="btn">Calculer la puissance</button>
-            <button onclick="loadHistory()" class="btn">Historique</button>
-        </div>
-    </div>
-
-    <!-- ÉCRAN 3 : PARAMÉTRAGE -->
+    <!-- ÉCRAN 2 : PARAMÉTRAGE AVANCÉ -->
     <div id="screen-setup" class="screen justify-center">
-        <button onclick="showScreen('screen-menu')" class="text-sm uppercase tracking-wide mb-8 no-print">&larr; Retour</button>
-        <h2 class="text-2xl font-bold mb-8 uppercase">Paramètres du véhicule</h2>
+        <h2 class="text-2xl font-bold mb-8 uppercase text-center border-b pb-4">Configuration Véhicule</h2>
         
-        <div class="space-y-10 w-full max-w-sm mx-auto flex-grow">
+        <div class="space-y-6 w-full max-w-sm mx-auto flex-grow overflow-y-auto pb-8">
             <div>
-                <label class="block text-sm uppercase tracking-wide text-gray-400 mb-2">Poids de la voiture (kg)</label>
-                <input type="number" id="input-weight" value="1200" pattern="[0-9]*">
-                <p class="text-xs text-gray-500 mt-2">Incluez votre poids et l'essence.</p>
+                <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">Poids total (kg)</label>
+                <input type="number" id="input-weight" value="1615" pattern="[0-9]*">
             </div>
             <div>
-                <label class="block text-sm uppercase tracking-wide text-gray-400 mb-2">Régime Maximum (tr/min)</label>
-                <input type="number" id="input-rpm" value="6500" pattern="[0-9]*">
-                <p class="text-xs text-gray-500 mt-2">Le test est estimé de 1500 tr/min jusqu'à cette valeur.</p>
+                <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1 mt-4">Régime Maximum (tr/min)</label>
+                <input type="number" id="input-rpm" value="4500" pattern="[0-9]*">
+            </div>
+            <div class="p-4 border border-gray-800 mt-6">
+                <p class="text-xs text-gray-500 uppercase mb-4 text-center">Étalonnage Boîte de vitesses (3ème)</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">Vitesse à 1500 tr/min (km/h)</label>
+                        <input type="number" id="input-v1500" value="50" pattern="[0-9]*">
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">Vitesse au Rupteur/Max (km/h)</label>
+                        <input type="number" id="input-vmax" value="130" pattern="[0-9]*">
+                    </div>
+                </div>
             </div>
         </div>
         
-        <button onclick="showScreen('screen-calibrate')" class="btn mt-8">Suivant</button>
+        <button onclick="saveSetupAndCalibrate()" class="btn mt-4">Suivant</button>
     </div>
 
-    <!-- ÉCRAN 4 : CALIBRATION -->
+    <!-- ÉCRAN 3 : CALIBRATION -->
     <div id="screen-calibrate" class="screen justify-center text-center">
-        <button onclick="showScreen('screen-setup')" class="text-sm uppercase tracking-wide mb-8 text-left no-print">&larr; Retour</button>
-        <h2 class="text-2xl font-bold mb-4 uppercase">Calibration</h2>
+        <button onclick="showScreen('screen-setup')" class="text-sm uppercase tracking-wide mb-8 text-left no-print text-gray-400">&larr; Retour</button>
+        <h2 class="text-2xl font-bold mb-4 uppercase">Fixation</h2>
         
         <div class="flex-grow flex flex-col justify-center items-center space-y-8">
-            <div class="w-24 h-24 border-2 border-white rounded-lg flex items-center justify-center mb-4">
-                <div class="w-16 h-2 bg-white rounded"></div>
+            <div class="w-24 h-24 border-2 border-white flex items-center justify-center mb-2">
+                <div class="w-16 h-1 bg-white"></div>
             </div>
-            <p class="text-sm text-gray-300 max-w-xs">Fixez solidement votre téléphone ou posez-le à plat dans la voiture. Il ne doit plus bouger pendant le test.</p>
+            <p class="text-sm text-gray-300 max-w-xs">Fixez le téléphone fermement. Les vibrations du diesel sont filtrées, mais l'appareil ne doit pas glisser.</p>
             
-            <button id="btn-calibrate" onclick="calibrateSensors()" class="btn">Calibrer l'angle</button>
-            <p id="calib-status" class="text-xs text-green-400 hidden mt-4">Calibration OK. Prêt.</p>
+            <button id="btn-calibrate" onclick="calibrateSensors()" class="btn">Calibrer</button>
+            <p id="calib-status" class="text-xs text-white hidden mt-4 border border-white p-2">Prêt pour l'enregistrement.</p>
         </div>
         
-        <button id="btn-go-record" onclick="showScreen('screen-record')" class="btn mt-8 opacity-50 pointer-events-none transition-opacity">Passer au test</button>
+        <button id="btn-go-record" onclick="showScreen('screen-record')" class="btn mt-8 opacity-50 pointer-events-none">Passer au test</button>
     </div>
 
-    <!-- ÉCRAN 5 : ENREGISTREMENT -->
+    <!-- ÉCRAN 4 : ENREGISTREMENT -->
     <div id="screen-record" class="screen justify-center text-center">
-        <h2 class="text-xl font-bold mb-2 uppercase text-red-500 animate-pulse" id="record-status">Prêt pour le tir</h2>
-        <p class="text-xs text-gray-400 mb-12">Démarrez à 1500 tr/min en 3ème vitesse. Appuyez sur GO et accélérez à fond jusqu'au rupteur.</p>
+        <h2 class="text-xl font-bold mb-2 uppercase text-white" id="record-status">En Attente</h2>
+        <p class="text-xs text-gray-400 mb-12">Stabilisez-vous à 1500 tr/min en 3ème. Appuyez sur GO et accélérez à fond.</p>
         
         <div class="flex-grow flex flex-col justify-center items-center">
             <button id="btn-go" onclick="toggleRecording()" class="btn-go">GO</button>
-            <div id="live-data" class="mt-12 hidden">
-                <div class="text-5xl font-bold font-mono" id="live-speed">0</div>
-                <div class="text-sm text-gray-400 uppercase">Vitesse relative</div>
+            <div id="live-data" class="mt-12 hidden w-full grid grid-cols-2 gap-4">
+                <div>
+                    <div class="text-4xl font-bold font-mono" id="live-speed">0</div>
+                    <div class="text-xs text-gray-400 uppercase">km/h</div>
+                </div>
+                <div>
+                    <div class="text-4xl font-bold font-mono" id="live-rpm">1500</div>
+                    <div class="text-xs text-gray-400 uppercase">tr/min (est.)</div>
+                </div>
             </div>
         </div>
         
         <button onclick="cancelRecording()" class="text-sm uppercase tracking-wide mt-12 text-gray-500" id="btn-cancel-record">Annuler</button>
     </div>
 
-    <!-- ÉCRAN 6 : RÉSULTATS -->
+    <!-- ÉCRAN 5 : RÉSULTATS -->
     <div id="screen-results" class="screen">
-        <div class="print-only hidden print-header">
-            <h1 class="text-3xl font-extrabold uppercase">Dyno Report</h1>
+        <div class="print-only hidden border-b-2 border-black pb-4 mb-6">
+            <h1 class="text-3xl font-extrabold uppercase">Rapport de Télémétrie</h1>
             <p class="text-sm text-gray-600" id="pdf-date"></p>
+            <p class="text-sm text-gray-600" id="pdf-params"></p>
         </div>
 
-        <button onclick="showScreen('screen-menu')" class="text-sm uppercase tracking-wide mb-6 no-print">&larr; Menu Principal</button>
+        <button onclick="showScreen('screen-setup')" class="text-sm uppercase tracking-wide mb-6 no-print text-gray-400">&larr; Nouveau Test</button>
         
-        <div class="grid grid-cols-2 gap-4 mb-8">
-            <div class="border border-gray-700 p-4 text-center print:border-gray-300">
-                <p class="text-xs text-gray-400 uppercase tracking-widest print:text-gray-600">Puissance Moteur</p>
-                <p class="text-3xl font-bold"><span id="res-hp-engine">--</span> <span class="text-sm font-normal">ch</span></p>
+        <div class="grid grid-cols-2 gap-2 mb-6">
+            <div class="border border-gray-600 print-border p-3 text-center">
+                <p class="text-xs text-gray-400 print-text uppercase tracking-widest">Puissance (Moteur)</p>
+                <p class="text-2xl font-bold"><span id="res-hp-engine">--</span> ch</p>
             </div>
-            <div class="border border-gray-700 p-4 text-center print:border-gray-300">
-                <p class="text-xs text-gray-400 uppercase tracking-widest print:text-gray-600">Couple</p>
-                <p class="text-3xl font-bold"><span id="res-torque">--</span> <span class="text-sm font-normal">Nm</span></p>
-            </div>
-            <div class="border border-gray-700 p-4 text-center col-span-2 print:border-gray-300">
-                <p class="text-xs text-gray-400 uppercase tracking-widest print:text-gray-600">Puissance aux roues (calculée)</p>
-                <p class="text-xl font-bold"><span id="res-hp-wheel">--</span> ch</p>
+            <div class="border border-gray-600 print-border p-3 text-center">
+                <p class="text-xs text-gray-400 print-text uppercase tracking-widest">Couple Max</p>
+                <p class="text-2xl font-bold"><span id="res-torque">--</span> Nm</p>
             </div>
         </div>
 
-        <div class="w-full bg-black print:bg-white rounded p-2 mb-8" id="chart-container" style="position: relative; height:40vh; width:100%">
+        <!-- Conteneur du Graphique -->
+        <div class="w-full bg-black print:bg-white border border-gray-800 print:border-none p-2 mb-6" id="chart-container" style="position: relative; height:45vh; width:100%">
             <canvas id="dynoChart"></canvas>
         </div>
 
         <div class="space-y-4 no-print mt-auto">
-            <button onclick="saveRun()" class="btn" id="btn-save">Enregistrer ce tir</button>
-            <button onclick="window.print()" class="btn bg-white text-black">Générer PDF / Imprimer</button>
+            <button onclick="window.print()" class="btn bg-white text-black">Générer PDF</button>
         </div>
-    </div>
-
-    <!-- ÉCRAN 7 : HISTORIQUE -->
-    <div id="screen-history" class="screen">
-        <button onclick="showScreen('screen-menu')" class="text-sm uppercase tracking-wide mb-8">&larr; Retour</button>
-        <h2 class="text-2xl font-bold mb-8 uppercase">Historique</h2>
-        
-        <div id="history-list" class="space-y-4 flex-grow overflow-y-auto">
-            <!-- Rempli par JS -->
-        </div>
-        <button onclick="clearHistory()" class="text-sm text-red-500 uppercase mt-8 text-center w-full">Effacer l'historique</button>
     </div>
 
     <script>
-        // --- ETAT DE L'APPLICATION ---
         const AppState = {
-            weight: 1200,
-            maxRpm: 6500,
-            baseAccelerationZ: 0,
+            weight: 1615,
+            rpmMax: 4500,
+            v1500: 50,
+            vMax: 130,
+            
             isRecording: false,
-            runData: [], // { time, accel }
-            startTime: 0,
-            lastTime: 0,
-            velocity: 0,
+            runData: [], 
+            
+            // Sensor fusion vars
+            smoothedAccel: 0,
+            integratedSpeed_ms: 0, 
+            gpsSpeed_ms: 0,
+            lastGpsTime: 0,
+            lastMotionTime: 0,
+            watchId: null,
+            
             dynoChart: null
         };
 
-        // Constantes physiques
         const GRAVITY = 9.81;
-        const LOSS_FACTOR = 0.85; // Estimation 15% de perte transmission
-        const WATTS_TO_CH = 735.5; // 1 Ch métrique = 735.5 Watts
+        const LOSS_FACTOR = 0.85; // 15% perte
+        const WATTS_TO_CH = 735.5;
+        const ALPHA = 0.1; // Filtre passe-bas fort pour gommer les vibrations diesel
+
+        function showMessage(text) {
+            document.getElementById('msg-text').innerText = text;
+            document.getElementById('msg-box').classList.add('active');
+        }
+        function closeMessage() {
+            document.getElementById('msg-box').classList.remove('active');
+        }
 
         function showScreen(screenId) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -249,164 +263,154 @@
             window.scrollTo(0,0);
         }
 
-        // --- AUTORISATIONS (iOS / WebKit) ---
         async function requestPermissions() {
             try {
-                // Demande gyroscope/accéléromètre (Obligatoire sur iOS 13+)
+                // DeviceMotion (iOS)
                 if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                     const permission = await DeviceMotionEvent.requestPermission();
                     if (permission !== 'granted') {
-                        alert("Accès aux capteurs refusé.");
+                        showMessage("L'accès au gyroscope est obligatoire pour filtrer les données.");
                         return;
                     }
                 }
                 
-                // Demande GPS
+                // GPS
                 if ("geolocation" in navigator) {
                     navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            // Succès, on passe au menu
-                            showScreen('screen-menu');
-                        },
-                        (error) => {
-                            alert("Veuillez autoriser la localisation (GPS) pour améliorer la précision.");
-                            // On autorise quand même l'accès au menu si GPS refuse, on se basera 100% sur l'accéléromètre
-                            showScreen('screen-menu'); 
-                        },
+                        (position) => { showScreen('screen-setup'); },
+                        (error) => { showMessage("Activez le GPS pour étalonner la vitesse précisément."); },
                         { enableHighAccuracy: true }
                     );
                 } else {
-                    showScreen('screen-menu');
+                    showScreen('screen-setup');
                 }
             } catch (e) {
-                alert("Erreur: " + e.message);
-                showScreen('screen-menu'); // Mode dégradé
+                showMessage("Erreur: " + e.message);
+                showScreen('screen-setup'); 
             }
         }
 
-        // --- CALIBRATION ---
-        let calibrationSamples = [];
+        function saveSetupAndCalibrate() {
+            AppState.weight = parseFloat(document.getElementById('input-weight').value) || 1615;
+            AppState.rpmMax = parseFloat(document.getElementById('input-rpm').value) || 4500;
+            AppState.v1500 = parseFloat(document.getElementById('input-v1500').value) || 50;
+            AppState.vMax = parseFloat(document.getElementById('input-vmax').value) || 130;
+            showScreen('screen-calibrate');
+        }
+
         function calibrateSensors() {
             const btn = document.getElementById('btn-calibrate');
-            btn.innerText = "Calibration en cours...";
+            btn.innerText = "Calibration...";
             btn.classList.add('opacity-50');
-            calibrationSamples = [];
             
-            const handleCalib = (e) => {
-                // On utilise accelerationIncludingGravity pour trouver le vecteur de gravité
-                if(e.accelerationIncludingGravity) {
-                    let a = Math.sqrt(
-                        Math.pow(e.accelerationIncludingGravity.x || 0, 2) +
-                        Math.pow(e.accelerationIncludingGravity.y || 0, 2) +
-                        Math.pow(e.accelerationIncludingGravity.z || 0, 2)
-                    );
-                    calibrationSamples.push(a);
-                }
-            };
-
-            window.addEventListener('devicemotion', handleCalib);
-
+            // Attente de 2s pour s'assurer que le tel est posé
             setTimeout(() => {
-                window.removeEventListener('devicemotion', handleCalib);
-                
                 btn.innerText = "Recalibrer";
                 btn.classList.remove('opacity-50');
-                
                 document.getElementById('calib-status').classList.remove('hidden');
-                
-                const btnGo = document.getElementById('btn-go-record');
-                btnGo.classList.remove('opacity-50', 'pointer-events-none');
-                
-                // Met à jour les paramètres
-                AppState.weight = parseFloat(document.getElementById('input-weight').value) || 1200;
-                AppState.maxRpm = parseFloat(document.getElementById('input-rpm').value) || 6500;
-                
+                document.getElementById('btn-go-record').classList.remove('opacity-50', 'pointer-events-none');
             }, 2000);
         }
 
-        // --- ENREGISTREMENT ET CALCULS ---
         function toggleRecording() {
             const btn = document.getElementById('btn-go');
             const status = document.getElementById('record-status');
-            const liveData = document.getElementById('live-data');
-            const liveSpeed = document.getElementById('live-speed');
-            const btnCancel = document.getElementById('btn-cancel-record');
-
+            
             if (!AppState.isRecording) {
-                // START RECORDING
+                // START
                 AppState.isRecording = true;
                 AppState.runData = [];
-                AppState.velocity = 0;
-                AppState.startTime = performance.now();
-                AppState.lastTime = AppState.startTime;
+                AppState.smoothedAccel = 0;
+                AppState.integratedSpeed_ms = AppState.v1500 / 3.6; // On part de l'estimation de départ
+                AppState.lastMotionTime = performance.now();
 
                 btn.innerText = "STOP";
                 btn.classList.add('bg-white', 'text-black');
-                status.innerText = "Enregistrement en cours...";
-                liveData.classList.remove('hidden');
-                btnCancel.classList.add('hidden');
+                status.innerText = "Enregistrement en cours";
+                status.classList.add('text-red-500', 'animate-pulse');
+                document.getElementById('live-data').classList.remove('hidden');
+                document.getElementById('btn-cancel-record').classList.add('hidden');
+
+                // Lancement GPS Tracker
+                AppState.watchId = navigator.geolocation.watchPosition(
+                    (pos) => {
+                        if(pos.coords.speed !== null) {
+                            AppState.gpsSpeed_ms = pos.coords.speed;
+                            // Fusion : On corrige doucement la vitesse calculée avec la vraie vitesse GPS
+                            AppState.integratedSpeed_ms = (AppState.integratedSpeed_ms * 0.7) + (AppState.gpsSpeed_ms * 0.3);
+                        }
+                    }, 
+                    null, 
+                    { enableHighAccuracy: true, maximumAge: 0 }
+                );
 
                 window.addEventListener('devicemotion', handleMotion);
             } else {
-                // STOP RECORDING
+                // STOP
                 stopRecording();
             }
-        }
-
-        function cancelRecording() {
-            showScreen('screen-setup');
         }
 
         function handleMotion(e) {
             if (!AppState.isRecording) return;
             
             let currentTime = performance.now();
-            let dt = (currentTime - AppState.lastTime) / 1000; // secondes
-            AppState.lastTime = currentTime;
+            let dt = (currentTime - AppState.lastMotionTime) / 1000; 
+            AppState.lastMotionTime = currentTime;
 
-            // On utilise l'accélération sans la gravité (idéal)
             let ax = e.acceleration.x || 0;
             let ay = e.acceleration.y || 0;
             let az = e.acceleration.z || 0;
+            let rawAccel = Math.sqrt(ax*ax + ay*ay + az*az); // Magnitude
 
-            // Simplification : on prend la magnitude de l'accélération linéaire sur le plan horizontal (approximatif)
-            // Pour être tolérant à l'orientation, on prend la magnitude totale. 
-            // Lors d'une forte accélération en ligne droite, c'est ce vecteur qui domine.
-            let linearAccel = Math.sqrt(ax*ax + ay*ay + az*az);
+            // FILTRE PASSE-BAS (Gomme les vibrations moteur)
+            AppState.smoothedAccel = (rawAccel * ALPHA) + (AppState.smoothedAccel * (1 - ALPHA));
             
-            // Si l'accélération globale est négative (freinage), on pourrait l'ignorer, 
-            // mais Math.sqrt est toujours positif. On va utiliser une heuristique : 
-            // si l'axe dominant est négatif, c'est un freinage.
-            // Pour faire simple sur le web : on intègre juste la magnitude filtrée.
+            // Seuil mort pour ignorer le bruit de route constant
+            let effectiveAccel = AppState.smoothedAccel;
+            if (effectiveAccel < 0.3) effectiveAccel = 0;
+
+            // Intégration de la vitesse (V = V0 + A*t)
+            AppState.integratedSpeed_ms += effectiveAccel * dt;
+
+            let v_kmh = AppState.integratedSpeed_ms * 3.6;
             
-            // Lissage basique (Low-pass filter)
-            let prevAccel = AppState.runData.length > 0 ? AppState.runData[AppState.runData.length-1].accel : 0;
-            let smoothedAccel = (linearAccel * 0.2) + (prevAccel * 0.8);
+            // Estimation RPM en direct
+            let currentRpm = estimateRPM(v_kmh);
 
-            // Seuil de bruit (ignorer les micro-vibrations)
-            if (smoothedAccel < 0.3) smoothedAccel = 0;
-
-            AppState.velocity += smoothedAccel * dt; // v en m/s
-
-            // Affichage en direct (km/h)
-            document.getElementById('live-speed').innerText = Math.round(AppState.velocity * 3.6);
+            // Affichage UI
+            document.getElementById('live-speed').innerText = Math.round(v_kmh);
+            document.getElementById('live-rpm').innerText = Math.round(currentRpm);
 
             AppState.runData.push({
-                time: (currentTime - AppState.startTime) / 1000,
-                accel: smoothedAccel,
-                velocity: AppState.velocity
+                time: currentTime,
+                accel: effectiveAccel,
+                speed_ms: AppState.integratedSpeed_ms,
+                rpm: currentRpm
             });
+        }
+
+        function estimateRPM(v_kmh) {
+            // Règle de 3 basée sur la config de boîte
+            let rpm = 1500 + ((v_kmh - AppState.v1500) * (AppState.rpmMax - 1500) / (AppState.vMax - AppState.v1500));
+            if (rpm < 1000) return 1000;
+            return rpm;
+        }
+
+        function cancelRecording() {
+            showScreen('screen-setup');
         }
 
         function stopRecording() {
             AppState.isRecording = false;
             window.removeEventListener('devicemotion', handleMotion);
+            if(AppState.watchId) navigator.geolocation.clearWatch(AppState.watchId);
             
-            // Reset UI
             const btn = document.getElementById('btn-go');
             btn.innerText = "GO";
             btn.classList.remove('bg-white', 'text-black');
-            document.getElementById('record-status').innerText = "Prêt pour le tir";
+            document.getElementById('record-status').innerText = "Terminé";
+            document.getElementById('record-status').classList.remove('text-red-500', 'animate-pulse');
             document.getElementById('live-data').classList.add('hidden');
             document.getElementById('btn-cancel-record').classList.remove('hidden');
 
@@ -414,93 +418,84 @@
         }
 
         function processRunData() {
-            if (AppState.runData.length < 10) {
-                alert("Tir trop court pour être analysé.");
+            if (AppState.runData.length < 15) {
+                showMessage("Tir trop court, pas assez de données pour l'analyse.");
                 return;
             }
 
-            const m = AppState.weight;
-            let maxHpWheel = 0;
-            let maxHpEngine = 0;
+            let maxHp = 0;
             let maxTorque = 0;
-
             let labelsRpm = [];
             let dataHp = [];
             let dataTorque = [];
 
-            // Trouver la vitesse max pour mapper les RPM
-            let vMax = Math.max(...AppState.runData.map(d => d.velocity));
-            if(vMax === 0) vMax = 1; // éviter division par zero
+            // Aérodynamisme simplifié : F_aero = 0.5 * rho * Cd * A * v^2
+            // Simplification générique pour une berline : F_aero ≈ 0.45 * v^2
+            const AERO_COEF = 0.45; 
 
-            // Lissage des données pour la courbe (Moving Average sur une fenêtre plus large)
-            let windowSize = Math.floor(AppState.runData.length / 20) || 2;
-            
             for (let i = 0; i < AppState.runData.length; i++) {
-                let current = AppState.runData[i];
+                let d = AppState.runData[i];
                 
-                // Moving average accel
-                let sumAccel = 0;
-                let count = 0;
-                for(let j = Math.max(0, i - windowSize); j <= Math.min(AppState.runData.length - 1, i + windowSize); j++) {
-                    sumAccel += AppState.runData[j].accel;
-                    count++;
-                }
-                let avgAccel = sumAccel / count;
-
-                // Calcul Force = m * a
-                let f = m * avgAccel;
+                // Pour lisser la courbe visuelle, on fait une moyenne mobile sur la vitesse
+                let F_accel = AppState.weight * d.accel;
+                let F_aero = AERO_COEF * (d.speed_ms * d.speed_ms);
+                let F_total = F_accel + F_aero;
                 
-                // Calcul Puissance = F * v (en Watts)
-                let powerWatts = f * current.velocity;
-                
-                // Conversion en Chevaux (Ch)
+                let powerWatts = F_total * d.speed_ms;
                 let hpWheel = powerWatts / WATTS_TO_CH;
-                let hpEngine = hpWheel / LOSS_FACTOR; // +15% de perte environ
-
-                // Mapping Vitesse -> RPM (On assume un tir en 1 seule vitesse)
-                // Le tir commence à 1500 tr/min
-                let currentRpm = 1500 + ((current.velocity / vMax) * (AppState.maxRpm - 1500));
+                let hpEngine = hpWheel / LOSS_FACTOR;
                 
-                // Calcul Couple (Nm)
-                // P(W) = C(Nm) * RPM * (2*pi/60)  =>  C = P / (RPM * 0.10472)
-                let torque = 0;
-                if (currentRpm > 0) {
-                    torque = powerWatts / (currentRpm * 0.10472);
+                let torqueNm = 0;
+                if (d.rpm > 0) {
+                    // C = P(watts) / (RPM * 2pi/60)
+                    torqueNm = powerWatts / (d.rpm * 0.10472);
                 }
 
-                // Filtrage des anomalies (chute brutale = passage de vitesse ou freinage)
-                if (hpEngine > 0 && currentRpm <= AppState.maxRpm) {
-                    labelsRpm.push(Math.round(currentRpm));
+                // Filtrage pour ne garder que la zone de tir utile
+                if (hpEngine > 5 && d.rpm >= 1400 && d.rpm <= (AppState.rpmMax + 200)) {
+                    labelsRpm.push(Math.round(d.rpm));
                     dataHp.push(hpEngine);
-                    dataTorque.push(torque);
+                    dataTorque.push(torqueNm);
 
-                    if (hpEngine > maxHpEngine) maxHpEngine = hpEngine;
-                    if (hpWheel > maxHpWheel) maxHpWheel = hpWheel;
-                    if (torque > maxTorque) maxTorque = torque;
+                    if (hpEngine > maxHp) maxHp = hpEngine;
+                    if (torqueNm > maxTorque) maxTorque = torqueNm;
                 }
             }
 
-            // Met à jour l'UI
-            document.getElementById('res-hp-wheel').innerText = Math.round(maxHpWheel);
-            document.getElementById('res-hp-engine').innerText = Math.round(maxHpEngine);
-            document.getElementById('res-torque').innerText = Math.round(maxTorque);
-            document.getElementById('pdf-date').innerText = new Date().toLocaleString();
-            
-            // Stocke temporairement pour la sauvegarde
-            AppState.currentResult = {
-                date: new Date().toISOString(),
-                hp: Math.round(maxHpEngine),
-                torque: Math.round(maxTorque),
-                weight: m,
-                maxRpm: AppState.maxRpm
-            };
+            if(labelsRpm.length === 0) {
+                showMessage("Erreur d'analyse. Assurez-vous d'accélérer fortement après avoir appuyé sur GO.");
+                return;
+            }
 
-            document.getElementById('btn-save').innerText = "Enregistrer ce tir";
-            document.getElementById('btn-save').disabled = false;
-            document.getElementById('btn-save').classList.remove('opacity-50');
+            // Lissage visuel des tableaux finaux pour une belle courbe
+            dataHp = smoothArray(dataHp, 5);
+            dataTorque = smoothArray(dataTorque, 5);
+
+            document.getElementById('res-hp-engine').innerText = Math.round(maxHp);
+            document.getElementById('res-torque').innerText = Math.round(maxTorque);
+            
+            document.getElementById('pdf-date').innerText = "Date: " + new Date().toLocaleString();
+            document.getElementById('pdf-params').innerText = `Config: ${AppState.weight}kg | Boîte: ${AppState.v1500}km/h@1500 -> ${AppState.vMax}km/h@${AppState.rpmMax}`;
 
             drawChart(labelsRpm, dataHp, dataTorque);
             showScreen('screen-results');
+        }
+
+        // Simple Moving Average
+        function smoothArray(arr, windowSize) {
+            let result = [];
+            for (let i = 0; i < arr.length; i++) {
+                let start = Math.max(0, i - windowSize);
+                let end = Math.min(arr.length - 1, i + windowSize);
+                let sum = 0;
+                let count = 0;
+                for (let j = start; j <= end; j++) {
+                    sum += arr[j];
+                    count++;
+                }
+                result.push(sum / count);
+            }
+            return result;
         }
 
         function drawChart(labels, dataHp, dataTorque) {
@@ -510,11 +505,7 @@
                 AppState.dynoChart.destroy();
             }
 
-            // Thème adapté à l'écran (sombre) vs impression (clair)
-            // On utilise des couleurs distinctes mais adaptées au noir & blanc (gris)
-            // Mais pour une courbe de banc type Fuchs, le bleu et rouge classique est top.
-            // Restons sur Bleu/Rouge sombre, ça rend bien sur fond noir et blanc.
-
+            // Thème Strictement Noir et Blanc / Niveaux de gris
             AppState.dynoChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -523,8 +514,7 @@
                         {
                             label: 'Puissance (ch)',
                             data: dataHp,
-                            borderColor: '#3b82f6', // Bleu
-                            backgroundColor: 'transparent',
+                            borderColor: '#ffffff', // Blanc pur
                             borderWidth: 3,
                             yAxisID: 'y',
                             tension: 0.4,
@@ -533,8 +523,8 @@
                         {
                             label: 'Couple (Nm)',
                             data: dataTorque,
-                            borderColor: '#ef4444', // Rouge
-                            backgroundColor: 'transparent',
+                            borderColor: '#888888', // Gris
+                            borderDash: [5, 5], // Ligne pointillée pour le différencier facilement à l'impression
                             borderWidth: 3,
                             yAxisID: 'y1',
                             tension: 0.4,
@@ -545,94 +535,32 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: {
-                            labels: {
-                                color: window.matchMedia('print').matches ? '#000' : '#fff',
-                                font: { family: 'Inter' }
-                            }
-                        }
+                        legend: { labels: { color: '#888', font: { family: 'Inter', weight: 'bold' } } }
                     },
                     scales: {
                         x: {
                             title: { display: true, text: 'Régime (tr/min)', color: '#888' },
-                            ticks: { maxTicksLimit: 10, color: '#888' },
+                            ticks: { maxTicksLimit: 8, color: '#888' },
                             grid: { color: '#333' }
                         },
                         y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: { display: true, text: 'Puissance (ch)', color: '#3b82f6' },
-                            ticks: { color: '#888' },
+                            type: 'linear', display: true, position: 'left',
+                            title: { display: true, text: 'Puissance (ch)', color: '#fff' },
+                            ticks: { color: '#fff' },
                             grid: { color: '#333' }
                         },
                         y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: { display: true, text: 'Couple (Nm)', color: '#ef4444' },
+                            type: 'linear', display: true, position: 'right',
+                            title: { display: true, text: 'Couple (Nm)', color: '#888' },
                             ticks: { color: '#888' },
-                            grid: { drawOnChartArea: false }, // Ne pas superposer la grille
+                            grid: { drawOnChartArea: false }
                         }
                     }
                 }
             });
         }
-
-        // --- GESTION DE L'HISTORIQUE ---
-        function saveRun() {
-            if(!AppState.currentResult) return;
-            
-            let history = JSON.parse(localStorage.getItem('dyno_history') || '[]');
-            history.unshift(AppState.currentResult);
-            localStorage.setItem('dyno_history', JSON.stringify(history));
-            
-            const btn = document.getElementById('btn-save');
-            btn.innerText = "Enregistré !";
-            btn.disabled = true;
-            btn.classList.add('opacity-50');
-        }
-
-        function loadHistory() {
-            let history = JSON.parse(localStorage.getItem('dyno_history') || '[]');
-            const list = document.getElementById('history-list');
-            list.innerHTML = '';
-            
-            if (history.length === 0) {
-                list.innerHTML = '<p class="text-gray-500 text-center mt-10">Aucun tir enregistré.</p>';
-            } else {
-                history.forEach(run => {
-                    const date = new Date(run.date).toLocaleDateString('fr-FR', {
-                        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-                    });
-                    
-                    const el = document.createElement('div');
-                    el.className = 'border border-gray-800 p-4 rounded flex justify-between items-center';
-                    el.innerHTML = `
-                        <div>
-                            <p class="font-bold text-lg">${run.hp} <span class="text-xs font-normal">ch</span> / ${run.torque} <span class="text-xs font-normal">Nm</span></p>
-                            <p class="text-xs text-gray-500">${date} - ${run.weight}kg</p>
-                        </div>
-                    `;
-                    list.appendChild(el);
-                });
-            }
-            
-            showScreen('screen-history');
-        }
-
-        function clearHistory() {
-            if(confirm("Effacer tout l'historique ?")) {
-                localStorage.removeItem('dyno_history');
-                loadHistory();
-            }
-        }
-
     </script>
 </body>
 </html>
