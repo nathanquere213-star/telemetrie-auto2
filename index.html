@@ -3,560 +3,523 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pocket Dyno Pro</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Télémétrie Auto</title>
+    <!-- Rendre l'app installable (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon" href="https://via.placeholder.com/192/000000/FFFFFF/?text=TA">
+    
+    <!-- Chart.js pour le graphique -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- jsPDF pour l'export PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        
+        :root {
+            --bg-color: #000000;
+            --text-color: #FFFFFF;
+            --border-color: #333333;
+            --accent-color: #FFFFFF;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #000;
-            color: #fff;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
-            padding: 0;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
+            padding: 15px;
+            box-sizing: border-box;
         }
 
-        input[type="number"] {
-            background-color: transparent;
-            border: none;
-            border-bottom: 1px solid #666;
-            color: #fff;
-            font-size: 1.25rem;
-            text-align: center;
-            width: 100%;
-            outline: none;
-            border-radius: 0;
-            appearance: none;
-            padding-bottom: 0.25rem;
-        }
-        input[type="number"]:focus {
-            border-bottom-color: #fff;
+        h1, h2, h3 { margin-top: 0; font-weight: 600; }
+        
+        .card {
+            background-color: #111;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
         }
 
-        .btn {
-            border: 2px solid #fff;
-            background: transparent;
-            color: #fff;
-            padding: 1rem 2rem;
-            text-transform: uppercase;
-            font-weight: 800;
-            letter-spacing: 2px;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            width: 100%;
+        label {
             display: block;
-            text-align: center;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+            color: #ccc;
         }
-        .btn:active {
-            background: #fff;
-            color: #000;
+
+        input, select {
+            width: 100%;
+            background-color: #000;
+            color: #FFF;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-size: 16px; /* Empêche le zoom sur iPhone */
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .row > div { flex: 1; }
+
+        button {
+            width: 100%;
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        button.secondary {
+            background-color: transparent;
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
         }
         
-        .btn-go {
-            border-radius: 50%;
-            width: 180px;
-            height: 180px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem;
-            margin: 0 auto;
-            border-width: 4px;
+        button.danger {
+            background-color: transparent;
+            color: #ff4444;
+            border: 1px solid #ff4444;
         }
 
-        .screen {
-            display: none;
-            min-height: 100vh;
-            padding: 2rem 1.5rem;
-            flex-direction: column;
-        }
-        .screen.active {
-            display: flex;
+        #statusBox {
+            text-align: center;
+            padding: 10px;
+            font-weight: bold;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
         }
 
-        /* Message Box personnalisée pour remplacer alert() */
-        #msg-box {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9);
-            z-index: 50;
-            justify-content: center;
-            align-items: center;
-            padding: 2rem;
-        }
-        #msg-box.active { display: flex; }
+        .status-wait { color: #aaa; }
+        .status-ready { color: #FFF; background-color: #222; }
+        .status-active { color: #000; background-color: #FFF; }
 
+        .hidden { display: none !important; }
+        
+        canvas {
+            background-color: #FFF;
+            border-radius: 4px;
+            padding: 5px;
+            margin-top: 15px;
+        }
+
+        /* Styles spécifiques pour l'impression/PDF */
         @media print {
-            body { background-color: #fff !important; color: #000 !important; }
+            body { background-color: #FFF; color: #000; padding: 0; }
             .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            #chart-container { width: 100% !important; height: 500px !important; background: #fff !important; }
-            .print-border { border-color: #000 !important; }
-            .print-text { color: #000 !important; }
+            .card { border: 1px solid #000; background-color: #FFF; box-shadow: none; }
+            canvas { border: 1px solid #000; }
         }
     </style>
 </head>
 <body>
 
-    <!-- BOITE DE MESSAGE (Erreurs / Infos) -->
-    <div id="msg-box">
-        <div class="border-2 border-white p-6 max-w-sm w-full text-center bg-black">
-            <p id="msg-text" class="mb-6"></p>
-            <button onclick="closeMessage()" class="btn text-sm p-3">Fermer</button>
-        </div>
+    <h1 class="no-print">Télémétrie Auto</h1>
+
+    <!-- MENU PRINCIPAL -->
+    <div id="menuView" class="no-print">
+        <button onclick="showView('setupView')">Nouveau Tir (Calcul Puissance)</button>
+        <button class="secondary" onclick="showView('historyView')">Historique</button>
     </div>
 
-    <!-- ÉCRAN 1 : AUTORISATIONS -->
-    <div id="screen-auth" class="screen active justify-center items-center text-center">
-        <h1 class="text-4xl font-extrabold mb-2 uppercase tracking-widest">Dyno Pro</h1>
-        <p class="text-gray-400 mb-12 text-xs uppercase tracking-widest">Télémétrie Haute Précision</p>
+    <!-- VUE PARAMETRAGE -->
+    <div id="setupView" class="hidden no-print">
         
-        <div class="space-y-6 w-full max-w-sm">
-            <p class="text-sm mb-6 text-gray-300">Cette application utilise la fusion des capteurs (Accéléromètre 60Hz + GPS 1Hz) pour annuler les vibrations moteur et tracer des courbes réalistes.</p>
-            <button onclick="requestPermissions()" class="btn">Activer les capteurs</button>
-        </div>
-    </div>
-
-    <!-- ÉCRAN 2 : PARAMÉTRAGE AVANCÉ -->
-    <div id="screen-setup" class="screen justify-center">
-        <h2 class="text-2xl font-bold mb-8 uppercase text-center border-b pb-4">Configuration Véhicule</h2>
-        
-        <div class="space-y-6 w-full max-w-sm mx-auto flex-grow overflow-y-auto pb-8">
-            <div>
-                <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">Poids total (kg)</label>
-                <input type="number" id="input-weight" value="1615" pattern="[0-9]*">
-            </div>
-            <div>
-                <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1 mt-4">Régime Maximum (tr/min)</label>
-                <input type="number" id="input-rpm" value="4500" pattern="[0-9]*">
-            </div>
-            <div class="p-4 border border-gray-800 mt-6">
-                <p class="text-xs text-gray-500 uppercase mb-4 text-center">Étalonnage Boîte de vitesses (3ème)</p>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">Vitesse à 1500 tr/min (km/h)</label>
-                        <input type="number" id="input-v1500" value="50" pattern="[0-9]*">
-                    </div>
-                    <div>
-                        <label class="block text-xs uppercase tracking-wide text-gray-400 mb-1">Vitesse au Rupteur/Max (km/h)</label>
-                        <input type="number" id="input-vmax" value="130" pattern="[0-9]*">
-                    </div>
-                </div>
+        <div class="card">
+            <h2>Profil du Véhicule</h2>
+            <select id="profileSelect" onchange="loadProfile()">
+                <option value="">-- Créer un nouveau profil --</option>
+            </select>
+            <input type="text" id="profileName" placeholder="Nom du profil (ex: BMW 330d E46)">
+            <div class="row">
+                <div><button onclick="saveProfile()">Enregistrer</button></div>
+                <div><button class="danger" onclick="deleteProfile()">Supprimer</button></div>
             </div>
         </div>
-        
-        <button onclick="saveSetupAndCalibrate()" class="btn mt-4">Suivant</button>
-    </div>
 
-    <!-- ÉCRAN 3 : CALIBRATION -->
-    <div id="screen-calibrate" class="screen justify-center text-center">
-        <button onclick="showScreen('screen-setup')" class="text-sm uppercase tracking-wide mb-8 text-left no-print text-gray-400">&larr; Retour</button>
-        <h2 class="text-2xl font-bold mb-4 uppercase">Fixation</h2>
-        
-        <div class="flex-grow flex flex-col justify-center items-center space-y-8">
-            <div class="w-24 h-24 border-2 border-white flex items-center justify-center mb-2">
-                <div class="w-16 h-1 bg-white"></div>
-            </div>
-            <p class="text-sm text-gray-300 max-w-xs">Fixez le téléphone fermement. Les vibrations du diesel sont filtrées, mais l'appareil ne doit pas glisser.</p>
+        <div class="card">
+            <h2>Paramètres</h2>
+            <label>Poids total avec conducteur (kg)</label>
+            <input type="number" id="carWeight" placeholder="ex: 1600">
             
-            <button id="btn-calibrate" onclick="calibrateSensors()" class="btn">Calibrer</button>
-            <p id="calib-status" class="text-xs text-white hidden mt-4 border border-white p-2">Prêt pour l'enregistrement.</p>
-        </div>
-        
-        <button id="btn-go-record" onclick="showScreen('screen-record')" class="btn mt-8 opacity-50 pointer-events-none">Passer au test</button>
-    </div>
-
-    <!-- ÉCRAN 4 : ENREGISTREMENT -->
-    <div id="screen-record" class="screen justify-center text-center">
-        <h2 class="text-xl font-bold mb-2 uppercase text-white" id="record-status">En Attente</h2>
-        <p class="text-xs text-gray-400 mb-12">Stabilisez-vous à 1500 tr/min en 3ème. Appuyez sur GO et accélérez à fond.</p>
-        
-        <div class="flex-grow flex flex-col justify-center items-center">
-            <button id="btn-go" onclick="toggleRecording()" class="btn-go">GO</button>
-            <div id="live-data" class="mt-12 hidden w-full grid grid-cols-2 gap-4">
+            <div class="row">
                 <div>
-                    <div class="text-4xl font-bold font-mono" id="live-speed">0</div>
-                    <div class="text-xs text-gray-400 uppercase">km/h</div>
+                    <label>Régime Max (tr/min)</label>
+                    <input type="number" id="rpmMax" placeholder="ex: 4500">
                 </div>
                 <div>
-                    <div class="text-4xl font-bold font-mono" id="live-rpm">1500</div>
-                    <div class="text-xs text-gray-400 uppercase">tr/min (est.)</div>
+                    <label>Vitesse à 1500 tr/min (km/h)</label>
+                    <input type="number" id="speed1500" placeholder="ex: 40">
+                </div>
+            </div>
+            
+            <label>Vitesse au régime Max (km/h)</label>
+            <input type="number" id="speedMax" placeholder="ex: 120">
+        </div>
+
+        <div class="card">
+            <h2>Calibration Capteurs</h2>
+            <p style="font-size: 0.8em; color: #aaa;">Posez le téléphone à plat ou fixez-le fermement avant de calibrer.</p>
+            <button onclick="requestPermissionsAndCalibrate()" class="secondary">Autoriser & Calibrer (0°)</button>
+            <div id="calibrationStatus" style="margin-top: 10px; font-size: 0.9em; text-align: center;">Non calibré</div>
+        </div>
+
+        <button onclick="startMeasurementView()">Suivant : Lancer l'enregistrement</button>
+        <button class="secondary" onclick="showView('menuView')">Retour</button>
+    </div>
+
+    <!-- VUE ENREGISTREMENT -->
+    <div id="recordView" class="hidden no-print">
+        <div id="statusBox" class="status-wait">EN ATTENTE...<br>Stabilisez-vous à 1500 tr/min en 3ème.</div>
+        
+        <div style="text-align: center; font-size: 2em; font-weight: bold; margin-bottom: 20px;" id="liveSpeed">0 km/h</div>
+        <div style="text-align: center; color: #aaa; margin-bottom: 20px;" id="liveAcc">Acc: 0.00 G</div>
+
+        <button id="btnStartRecord" onclick="startRecording()">DÉMARRER L'ENREGISTREMENT</button>
+        <button id="btnStopRecord" onclick="stopRecording()" class="danger hidden">STOPPER & CALCULER</button>
+        <button class="secondary" onclick="showView('setupView')" id="btnCancelRecord">Annuler</button>
+    </div>
+
+    <!-- VUE RÉSULTAT & PDF -->
+    <div id="resultView" class="hidden">
+        <div class="no-print">
+            <h2>Récapitulatif du tir</h2>
+            <div class="row">
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 0.9em; color:#aaa;">Puissance Est. (Moteur)</div>
+                    <div style="font-size: 1.5em; font-weight:bold;" id="resPower">-- ch</div>
+                </div>
+                <div class="card" style="text-align: center;">
+                    <div style="font-size: 0.9em; color:#aaa;">Couple Max</div>
+                    <div style="font-size: 1.5em; font-weight:bold;" id="resTorque">-- Nm</div>
                 </div>
             </div>
         </div>
-        
-        <button onclick="cancelRecording()" class="text-sm uppercase tracking-wide mt-12 text-gray-500" id="btn-cancel-record">Annuler</button>
+
+        <div class="card" style="background-color: #FFF; padding: 10px;">
+            <canvas id="chartCanvas"></canvas>
+        </div>
+
+        <div class="no-print" style="margin-top: 20px;">
+            <button onclick="window.print()">Générer PDF (Impression)</button>
+            <button class="secondary" onclick="showView('menuView')">Terminer</button>
+        </div>
     </div>
 
-    <!-- ÉCRAN 5 : RÉSULTATS -->
-    <div id="screen-results" class="screen">
-        <div class="print-only hidden border-b-2 border-black pb-4 mb-6">
-            <h1 class="text-3xl font-extrabold uppercase">Rapport de Télémétrie</h1>
-            <p class="text-sm text-gray-600" id="pdf-date"></p>
-            <p class="text-sm text-gray-600" id="pdf-params"></p>
-        </div>
-
-        <button onclick="showScreen('screen-setup')" class="text-sm uppercase tracking-wide mb-6 no-print text-gray-400">&larr; Nouveau Test</button>
-        
-        <div class="grid grid-cols-2 gap-2 mb-6">
-            <div class="border border-gray-600 print-border p-3 text-center">
-                <p class="text-xs text-gray-400 print-text uppercase tracking-widest">Puissance (Moteur)</p>
-                <p class="text-2xl font-bold"><span id="res-hp-engine">--</span> ch</p>
-            </div>
-            <div class="border border-gray-600 print-border p-3 text-center">
-                <p class="text-xs text-gray-400 print-text uppercase tracking-widest">Couple Max</p>
-                <p class="text-2xl font-bold"><span id="res-torque">--</span> Nm</p>
-            </div>
-        </div>
-
-        <!-- Conteneur du Graphique -->
-        <div class="w-full bg-black print:bg-white border border-gray-800 print:border-none p-2 mb-6" id="chart-container" style="position: relative; height:45vh; width:100%">
-            <canvas id="dynoChart"></canvas>
-        </div>
-
-        <div class="space-y-4 no-print mt-auto">
-            <button onclick="window.print()" class="btn bg-white text-black">Générer PDF</button>
-        </div>
+    <!-- VUE HISTORIQUE -->
+    <div id="historyView" class="hidden no-print">
+        <h2>Historique</h2>
+        <p style="color: #aaa;">Enregistrements précédents (à implémenter)</p>
+        <button class="secondary" onclick="showView('menuView')">Retour</button>
     </div>
 
     <script>
-        const AppState = {
-            weight: 1615,
-            rpmMax: 4500,
-            v1500: 50,
-            vMax: 130,
-            
-            isRecording: false,
-            runData: [], 
-            
-            // Sensor fusion vars
-            smoothedAccel: 0,
-            integratedSpeed_ms: 0, 
-            gpsSpeed_ms: 0,
-            lastGpsTime: 0,
-            lastMotionTime: 0,
-            watchId: null,
-            
-            dynoChart: null
-        };
+        // --- GESTION DES PROFILS ---
+        let profiles = JSON.parse(localStorage.getItem('telemetryProfiles')) || {};
 
-        const GRAVITY = 9.81;
-        const LOSS_FACTOR = 0.85; // 15% perte
-        const WATTS_TO_CH = 735.5;
-        const ALPHA = 0.1; // Filtre passe-bas fort pour gommer les vibrations diesel
-
-        function showMessage(text) {
-            document.getElementById('msg-text').innerText = text;
-            document.getElementById('msg-box').classList.add('active');
-        }
-        function closeMessage() {
-            document.getElementById('msg-box').classList.remove('active');
+        function updateProfileSelect() {
+            const select = document.getElementById('profileSelect');
+            select.innerHTML = '<option value="">-- Créer un nouveau profil --</option>';
+            for (let name in profiles) {
+                let opt = document.createElement('option');
+                opt.value = name;
+                opt.innerHTML = name;
+                select.appendChild(opt);
+            }
         }
 
-        function showScreen(screenId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(screenId).classList.add('active');
-            window.scrollTo(0,0);
+        function loadProfile() {
+            const name = document.getElementById('profileSelect').value;
+            if (name && profiles[name]) {
+                document.getElementById('profileName').value = name;
+                document.getElementById('carWeight').value = profiles[name].weight;
+                document.getElementById('rpmMax').value = profiles[name].rpmMax;
+                document.getElementById('speed1500').value = profiles[name].speed1500;
+                document.getElementById('speedMax').value = profiles[name].speedMax;
+            } else {
+                document.getElementById('profileName').value = '';
+                document.getElementById('carWeight').value = '';
+                document.getElementById('rpmMax').value = '';
+                document.getElementById('speed1500').value = '';
+                document.getElementById('speedMax').value = '';
+            }
         }
 
-        async function requestPermissions() {
+        function saveProfile() {
+            const name = document.getElementById('profileName').value.trim();
+            if (!name) return alert("Veuillez entrer un nom de profil.");
+            
+            profiles[name] = {
+                weight: document.getElementById('carWeight').value,
+                rpmMax: document.getElementById('rpmMax').value,
+                speed1500: document.getElementById('speed1500').value,
+                speedMax: document.getElementById('speedMax').value
+            };
+            
+            localStorage.setItem('telemetryProfiles', JSON.stringify(profiles));
+            updateProfileSelect();
+            document.getElementById('profileSelect').value = name;
+            alert("Profil '" + name + "' enregistré !");
+        }
+
+        function deleteProfile() {
+            const name = document.getElementById('profileSelect').value;
+            if (name && confirm("Supprimer le profil " + name + " ?")) {
+                delete profiles[name];
+                localStorage.setItem('telemetryProfiles', JSON.stringify(profiles));
+                updateProfileSelect();
+                loadProfile();
+            }
+        }
+
+        // Initialisation au chargement
+        updateProfileSelect();
+
+        // --- NAVIGATION ---
+        function showView(viewId) {
+            document.querySelectorAll('body > div').forEach(div => {
+                if(div.id) div.classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // --- VARIABLES CAPTEURS ---
+        let basePitch = 0; 
+        let currentPitch = 0;
+        let isCalibrated = false;
+        
+        let isRecording = false;
+        let filteredAcc = 0; // Filtre passe-bas
+        let currentSpeedGPS = 0;
+        let speedFromAcc = 0; // Vitesse calculée via accéléromètre
+        let lastTime = 0;
+        
+        let telemetryData = [];
+        let chartInstance = null;
+
+        // --- CAPTEURS ET CALIBRATION ---
+        async function requestPermissionsAndCalibrate() {
             try {
-                // DeviceMotion (iOS)
-                if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                    const permission = await DeviceMotionEvent.requestPermission();
-                    if (permission !== 'granted') {
-                        showMessage("L'accès au gyroscope est obligatoire pour filtrer les données.");
-                        return;
-                    }
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission !== 'granted') throw new Error('Refus orientation');
                 }
                 
-                // GPS
-                if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => { showScreen('screen-setup'); },
-                        (error) => { showMessage("Activez le GPS pour étalonner la vitesse précisément."); },
-                        { enableHighAccuracy: true }
-                    );
-                } else {
-                    showScreen('screen-setup');
-                }
-            } catch (e) {
-                showMessage("Erreur: " + e.message);
-                showScreen('screen-setup'); 
-            }
-        }
-
-        function saveSetupAndCalibrate() {
-            AppState.weight = parseFloat(document.getElementById('input-weight').value) || 1615;
-            AppState.rpmMax = parseFloat(document.getElementById('input-rpm').value) || 4500;
-            AppState.v1500 = parseFloat(document.getElementById('input-v1500').value) || 50;
-            AppState.vMax = parseFloat(document.getElementById('input-vmax').value) || 130;
-            showScreen('screen-calibrate');
-        }
-
-        function calibrateSensors() {
-            const btn = document.getElementById('btn-calibrate');
-            btn.innerText = "Calibration...";
-            btn.classList.add('opacity-50');
-            
-            // Attente de 2s pour s'assurer que le tel est posé
-            setTimeout(() => {
-                btn.innerText = "Recalibrer";
-                btn.classList.remove('opacity-50');
-                document.getElementById('calib-status').classList.remove('hidden');
-                document.getElementById('btn-go-record').classList.remove('opacity-50', 'pointer-events-none');
-            }, 2000);
-        }
-
-        function toggleRecording() {
-            const btn = document.getElementById('btn-go');
-            const status = document.getElementById('record-status');
-            
-            if (!AppState.isRecording) {
-                // START
-                AppState.isRecording = true;
-                AppState.runData = [];
-                AppState.smoothedAccel = 0;
-                AppState.integratedSpeed_ms = AppState.v1500 / 3.6; // On part de l'estimation de départ
-                AppState.lastMotionTime = performance.now();
-
-                btn.innerText = "STOP";
-                btn.classList.add('bg-white', 'text-black');
-                status.innerText = "Enregistrement en cours";
-                status.classList.add('text-red-500', 'animate-pulse');
-                document.getElementById('live-data').classList.remove('hidden');
-                document.getElementById('btn-cancel-record').classList.add('hidden');
-
-                // Lancement GPS Tracker
-                AppState.watchId = navigator.geolocation.watchPosition(
-                    (pos) => {
-                        if(pos.coords.speed !== null) {
-                            AppState.gpsSpeed_ms = pos.coords.speed;
-                            // Fusion : On corrige doucement la vitesse calculée avec la vraie vitesse GPS
-                            AppState.integratedSpeed_ms = (AppState.integratedSpeed_ms * 0.7) + (AppState.gpsSpeed_ms * 0.3);
-                        }
-                    }, 
-                    null, 
-                    { enableHighAccuracy: true, maximumAge: 0 }
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => { console.log("GPS OK"); },
+                    (err) => { alert("Erreur GPS. Activez la localisation."); },
+                    { enableHighAccuracy: true }
                 );
 
-                window.addEventListener('devicemotion', handleMotion);
-            } else {
-                // STOP
-                stopRecording();
+                window.addEventListener('deviceorientation', (event) => {
+                    currentPitch = event.beta; // Inclinaison (Pitch)
+                });
+                
+                window.addEventListener('devicemotion', (event) => {
+                    let rawAcc = event.acceleration.y; // Axe longitudinal
+                    if (rawAcc !== null) {
+                        // Filtre passe-bas pour gommer les vibrations du moteur
+                        filteredAcc = (rawAcc * 0.1) + (filteredAcc * 0.9);
+                        document.getElementById('liveAcc').innerText = "Acc: " + (filteredAcc/9.81).toFixed(2) + " G";
+                    }
+                });
+
+                navigator.geolocation.watchPosition((pos) => {
+                    if(pos.coords.speed !== null) {
+                        currentSpeedGPS = pos.coords.speed * 3.6; // m/s to km/h
+                        // Recalibrer la vitesse calculée sur le GPS toutes les secondes
+                        if(!isRecording) speedFromAcc = currentSpeedGPS; 
+                        document.getElementById('liveSpeed').innerText = currentSpeedGPS.toFixed(0) + " km/h";
+                    }
+                }, null, { enableHighAccuracy: true });
+
+                setTimeout(() => {
+                    basePitch = currentPitch;
+                    isCalibrated = true;
+                    document.getElementById('calibrationStatus').innerHTML = "Calibré avec succès. Tél. prêt.";
+                    document.getElementById('calibrationStatus').style.color = "#00FF00";
+                }, 1000);
+
+            } catch (e) {
+                alert("Erreur d'accès aux capteurs : " + e.message);
             }
         }
 
-        function handleMotion(e) {
-            if (!AppState.isRecording) return;
+        function startMeasurementView() {
+            if (!isCalibrated) return alert("Veuillez calibrer le téléphone d'abord.");
+            if (!document.getElementById('carWeight').value || !document.getElementById('rpmMax').value) {
+                return alert("Veuillez remplir le profil et les paramètres du véhicule.");
+            }
+            showView('recordView');
+        }
+
+        // --- ENREGISTREMENT ---
+        function startRecording() {
+            isRecording = true;
+            telemetryData = [];
+            speedFromAcc = currentSpeedGPS;
+            lastTime = Date.now();
+
+            document.getElementById('btnStartRecord').classList.add('hidden');
+            document.getElementById('btnCancelRecord').classList.add('hidden');
+            document.getElementById('btnStopRecord').classList.remove('hidden');
             
-            let currentTime = performance.now();
-            let dt = (currentTime - AppState.lastMotionTime) / 1000; 
-            AppState.lastMotionTime = currentTime;
+            let status = document.getElementById('statusBox');
+            status.className = 'status-active';
+            status.innerHTML = "ENREGISTREMENT EN COURS...<br>Accélérez à fond !";
 
-            let ax = e.acceleration.x || 0;
-            let ay = e.acceleration.y || 0;
-            let az = e.acceleration.z || 0;
-            let rawAccel = Math.sqrt(ax*ax + ay*ay + az*az); // Magnitude
+            recordLoop();
+        }
 
-            // FILTRE PASSE-BAS (Gomme les vibrations moteur)
-            AppState.smoothedAccel = (rawAccel * ALPHA) + (AppState.smoothedAccel * (1 - ALPHA));
+        function recordLoop() {
+            if(!isRecording) return;
             
-            // Seuil mort pour ignorer le bruit de route constant
-            let effectiveAccel = AppState.smoothedAccel;
-            if (effectiveAccel < 0.3) effectiveAccel = 0;
+            let now = Date.now();
+            let dt = (now - lastTime) / 1000; // secondes
+            lastTime = now;
 
-            // Intégration de la vitesse (V = V0 + A*t)
-            AppState.integratedSpeed_ms += effectiveAccel * dt;
-
-            let v_kmh = AppState.integratedSpeed_ms * 3.6;
+            // Intégration de l'accélération pour trouver la vitesse (fusion GPS/Acc)
+            speedFromAcc += (filteredAcc * dt) * 3.6; 
             
-            // Estimation RPM en direct
-            let currentRpm = estimateRPM(v_kmh);
+            let currentIncline = currentPitch - basePitch;
 
-            // Affichage UI
-            document.getElementById('live-speed').innerText = Math.round(v_kmh);
-            document.getElementById('live-rpm').innerText = Math.round(currentRpm);
-
-            AppState.runData.push({
-                time: currentTime,
-                accel: effectiveAccel,
-                speed_ms: AppState.integratedSpeed_ms,
-                rpm: currentRpm
+            telemetryData.push({
+                time: now,
+                accel: filteredAcc, // m/s^2
+                speed: speedFromAcc, // km/h
+                incline: currentIncline // degrés
             });
-        }
 
-        function estimateRPM(v_kmh) {
-            // Règle de 3 basée sur la config de boîte
-            let rpm = 1500 + ((v_kmh - AppState.v1500) * (AppState.rpmMax - 1500) / (AppState.vMax - AppState.v1500));
-            if (rpm < 1000) return 1000;
-            return rpm;
-        }
-
-        function cancelRecording() {
-            showScreen('screen-setup');
+            requestAnimationFrame(recordLoop);
         }
 
         function stopRecording() {
-            AppState.isRecording = false;
-            window.removeEventListener('devicemotion', handleMotion);
-            if(AppState.watchId) navigator.geolocation.clearWatch(AppState.watchId);
+            isRecording = false;
+            document.getElementById('btnStopRecord').classList.add('hidden');
+            document.getElementById('btnStartRecord').classList.remove('hidden');
+            document.getElementById('btnCancelRecord').classList.remove('hidden');
             
-            const btn = document.getElementById('btn-go');
-            btn.innerText = "GO";
-            btn.classList.remove('bg-white', 'text-black');
-            document.getElementById('record-status').innerText = "Terminé";
-            document.getElementById('record-status').classList.remove('text-red-500', 'animate-pulse');
-            document.getElementById('live-data').classList.add('hidden');
-            document.getElementById('btn-cancel-record').classList.remove('hidden');
+            let status = document.getElementById('statusBox');
+            status.className = 'status-wait';
+            status.innerHTML = "EN ATTENTE...";
 
-            processRunData();
-        }
-
-        function processRunData() {
-            if (AppState.runData.length < 15) {
-                showMessage("Tir trop court, pas assez de données pour l'analyse.");
+            if(telemetryData.length < 10) {
+                alert("Enregistrement trop court.");
                 return;
             }
+            
+            calculatePowerAndTorque();
+        }
 
-            let maxHp = 0;
+        // --- CALCULS MATHÉMATIQUES ---
+        function calculatePowerAndTorque() {
+            let weight = parseFloat(document.getElementById('carWeight').value);
+            let rpmMax = parseFloat(document.getElementById('rpmMax').value);
+            let speed1500 = parseFloat(document.getElementById('speed1500').value);
+            let speedMax = parseFloat(document.getElementById('speedMax').value);
+            
+            let maxPower = 0;
             let maxTorque = 0;
-            let labelsRpm = [];
-            let dataHp = [];
-            let dataTorque = [];
-
-            // Aérodynamisme simplifié : F_aero = 0.5 * rho * Cd * A * v^2
-            // Simplification générique pour une berline : F_aero ≈ 0.45 * v^2
-            const AERO_COEF = 0.45; 
-
-            for (let i = 0; i < AppState.runData.length; i++) {
-                let d = AppState.runData[i];
-                
-                // Pour lisser la courbe visuelle, on fait une moyenne mobile sur la vitesse
-                let F_accel = AppState.weight * d.accel;
-                let F_aero = AERO_COEF * (d.speed_ms * d.speed_ms);
-                let F_total = F_accel + F_aero;
-                
-                let powerWatts = F_total * d.speed_ms;
-                let hpWheel = powerWatts / WATTS_TO_CH;
-                let hpEngine = hpWheel / LOSS_FACTOR;
-                
-                let torqueNm = 0;
-                if (d.rpm > 0) {
-                    // C = P(watts) / (RPM * 2pi/60)
-                    torqueNm = powerWatts / (d.rpm * 0.10472);
-                }
-
-                // Filtrage pour ne garder que la zone de tir utile
-                if (hpEngine > 5 && d.rpm >= 1400 && d.rpm <= (AppState.rpmMax + 200)) {
-                    labelsRpm.push(Math.round(d.rpm));
-                    dataHp.push(hpEngine);
-                    dataTorque.push(torqueNm);
-
-                    if (hpEngine > maxHp) maxHp = hpEngine;
-                    if (torqueNm > maxTorque) maxTorque = torqueNm;
-                }
-            }
-
-            if(labelsRpm.length === 0) {
-                showMessage("Erreur d'analyse. Assurez-vous d'accélérer fortement après avoir appuyé sur GO.");
-                return;
-            }
-
-            // Lissage visuel des tableaux finaux pour une belle courbe
-            dataHp = smoothArray(dataHp, 5);
-            dataTorque = smoothArray(dataTorque, 5);
-
-            document.getElementById('res-hp-engine').innerText = Math.round(maxHp);
-            document.getElementById('res-torque').innerText = Math.round(maxTorque);
             
-            document.getElementById('pdf-date').innerText = "Date: " + new Date().toLocaleString();
-            document.getElementById('pdf-params').innerText = `Config: ${AppState.weight}kg | Boîte: ${AppState.v1500}km/h@1500 -> ${AppState.vMax}km/h@${AppState.rpmMax}`;
+            let labels = [];
+            let powerData = [];
+            let torqueData = [];
 
-            drawChart(labelsRpm, dataHp, dataTorque);
-            showScreen('screen-results');
+            telemetryData.forEach(point => {
+                let v_ms = point.speed / 3.6;
+                
+                // Formule Force = (m * a) + (m * g * sin(angle)) + F_aero
+                let angleRad = point.incline * (Math.PI / 180);
+                let F_accel = weight * point.accel;
+                let F_grav = weight * 9.81 * Math.sin(angleRad);
+                let F_aero = 0.5 * 1.2 * 0.3 * 2.2 * (v_ms * v_ms); // Approx basique Cx*S
+                
+                let F_total = F_accel + F_grav + F_aero;
+                if (F_total < 0) F_total = 0;
+
+                // Puissance Roue = Force * Vitesse
+                let P_watt = F_total * v_ms;
+                let P_ch_roue = P_watt / 735.5;
+                
+                // Perte transmission (estimation ~15% pour propulsion)
+                let P_ch_moteur = P_ch_roue / 0.85; 
+
+                // Interpolation des Tr/min basée sur les rapports de boîte donnés
+                let rpmRange = rpmMax - 1500;
+                let speedRange = speedMax - speed1500;
+                let rpmPoint = 1500 + ((point.speed - speed1500) * (rpmRange / speedRange));
+                
+                if (rpmPoint > 1000 && rpmPoint <= rpmMax + 200) {
+                    // Couple (Nm) = (P_watt_moteur * 60) / (2 * Pi * RPM)
+                    let P_watt_moteur = P_ch_moteur * 735.5;
+                    let torque = (P_watt_moteur * 60) / (2 * Math.PI * rpmPoint);
+
+                    if (P_ch_moteur > maxPower) maxPower = P_ch_moteur;
+                    if (torque > maxTorque && torque < 1000) maxTorque = torque; // Filtre anti-pic extrême
+
+                    labels.push(Math.round(rpmPoint));
+                    powerData.push(Math.round(P_ch_moteur));
+                    torqueData.push(Math.round(torque));
+                }
+            });
+
+            document.getElementById('resPower').innerText = Math.round(maxPower) + " ch";
+            document.getElementById('resTorque').innerText = Math.round(maxTorque) + " Nm";
+
+            drawChart(labels, powerData, torqueData);
+            showView('resultView');
         }
 
-        // Simple Moving Average
-        function smoothArray(arr, windowSize) {
-            let result = [];
-            for (let i = 0; i < arr.length; i++) {
-                let start = Math.max(0, i - windowSize);
-                let end = Math.min(arr.length - 1, i + windowSize);
-                let sum = 0;
-                let count = 0;
-                for (let j = start; j <= end; j++) {
-                    sum += arr[j];
-                    count++;
-                }
-                result.push(sum / count);
-            }
-            return result;
-        }
-
-        function drawChart(labels, dataHp, dataTorque) {
-            const ctx = document.getElementById('dynoChart').getContext('2d');
+        // --- GRAPHIQUE (Chart.js) ---
+        function drawChart(labels, powerData, torqueData) {
+            let ctx = document.getElementById('chartCanvas').getContext('2d');
             
-            if (AppState.dynoChart) {
-                AppState.dynoChart.destroy();
-            }
+            if (chartInstance) chartInstance.destroy();
 
-            // Thème Strictement Noir et Blanc / Niveaux de gris
-            AppState.dynoChart = new Chart(ctx, {
+            chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
                         {
                             label: 'Puissance (ch)',
-                            data: dataHp,
-                            borderColor: '#ffffff', // Blanc pur
-                            borderWidth: 3,
-                            yAxisID: 'y',
-                            tension: 0.4,
-                            pointRadius: 0
+                            data: powerData,
+                            borderColor: '#FF0000', // Rouge pour puissance
+                            backgroundColor: 'transparent',
+                            yAxisID: 'yPower',
+                            tension: 0.4
                         },
                         {
                             label: 'Couple (Nm)',
-                            data: dataTorque,
-                            borderColor: '#888888', // Gris
-                            borderDash: [5, 5], // Ligne pointillée pour le différencier facilement à l'impression
-                            borderWidth: 3,
-                            yAxisID: 'y1',
-                            tension: 0.4,
-                            pointRadius: 0
+                            data: torqueData,
+                            borderColor: '#0000FF', // Bleu pour couple
+                            backgroundColor: 'transparent',
+                            yAxisID: 'yTorque',
+                            tension: 0.4
                         }
                     ]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { labels: { color: '#888', font: { family: 'Inter', weight: 'bold' } } }
-                    },
                     scales: {
-                        x: {
-                            title: { display: true, text: 'Régime (tr/min)', color: '#888' },
-                            ticks: { maxTicksLimit: 8, color: '#888' },
-                            grid: { color: '#333' }
-                        },
-                        y: {
-                            type: 'linear', display: true, position: 'left',
-                            title: { display: true, text: 'Puissance (ch)', color: '#fff' },
-                            ticks: { color: '#fff' },
-                            grid: { color: '#333' }
-                        },
-                        y1: {
-                            type: 'linear', display: true, position: 'right',
-                            title: { display: true, text: 'Couple (Nm)', color: '#888' },
-                            ticks: { color: '#888' },
-                            grid: { drawOnChartArea: false }
-                        }
+                        x: { title: { display: true, text: 'Régime (tr/min)', color: '#000' }, ticks: {color:'#000'} },
+                        yPower: { type: 'linear', position: 'left', title: { display: true, text: 'Puissance (ch)', color: '#FF0000' }, ticks: {color:'#000'} },
+                        yTorque: { type: 'linear', position: 'right', title: { display: true, text: 'Couple (Nm)', color: '#0000FF' }, ticks: {color:'#000'} }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#000' } }
                     }
                 }
             });
